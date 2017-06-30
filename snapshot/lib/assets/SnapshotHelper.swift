@@ -7,7 +7,7 @@
 //
 
 // -----------------------------------------------------
-// IMPORTANT: When modifying this file, make sure to 
+// IMPORTANT: When modifying this file, make sure to
 //            increment the version number at the very
 //            bottom of the file to notify users about
 //            the new SnapshotHelper.swift
@@ -28,8 +28,8 @@ func setupSnapshot(_ app: XCUIApplication) {
     Snapshot.setupSnapshot(app)
 }
 
-func snapshot(_ name: String, waitForLoadingIndicator: Bool = true) {
-    Snapshot.snapshot(name, waitForLoadingIndicator: waitForLoadingIndicator)
+func snapshot(_ name: String, timeWaitingForIdle timeout: TimeInterval = 20) {
+    Snapshot.snapshot(name, timeWaitingForIdle: timeout)
 }
 
 open class Snapshot: NSObject {
@@ -96,9 +96,21 @@ open class Snapshot: NSObject {
         }
     }
 
-    open class func snapshot(_ name: String, waitForLoadingIndicator: Bool = true) {
+    @available(*, deprecated, renamed: "snapshot(_:timeWaitingForIdle:)")
+    open class func snapshot(_ name: String, waitForLoadingIndicator: Bool) {
         if waitForLoadingIndicator {
-            waitForLoadingIndicatorToDisappear()
+            snapshot(name)
+        } else {
+            snapshot(name, timeWaitingForIdle: 0)
+        }
+    }
+
+    /// - Parameters:
+    ///   - name: The name of the snapshot
+    ///   - timeout: Amount of seconds to wait until the network loading indicator disappears. Pass `0` if you don't want to wait.
+    open class func snapshot(_ name: String, timeWaitingForIdle timeout: TimeInterval = 20) {
+        if timeout > 0 {
+            waitForLoadingIndicatorToDisappear(within: timeout)
         }
 
         print("snapshot: \(name)") // more information about this, check out https://github.com/fastlane/fastlane/tree/master/snapshot#how-does-it-work
@@ -114,17 +126,25 @@ open class Snapshot: NSObject {
         #endif
     }
 
-    class func waitForLoadingIndicatorToDisappear() {
+    class func waitForLoadingIndicatorToDisappear(within timeout: TimeInterval) {
         #if os(tvOS)
             return
         #endif
 
-        let query = XCUIApplication().statusBars.children(matching: .other).element(boundBy: 1).children(matching: .other)
-
-        while (0..<query.count).map({ query.element(boundBy: $0) }).contains(where: { $0.isLoadingIndicator }) {
-            sleep(1)
-            print("Waiting for loading indicator to disappear...")
-        }
+        #if swift(>=3.1)
+            let networkLoadingIndicator = XCUIApplication().statusBars.networkLoadingIndicators.element
+            let networkLoadingIndicatorExists = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: networkLoadingIndicator)
+            XCTWaiter.wait(for: [networkLoadingIndicatorExists], timeout: timeout)
+        #else
+            let query = XCUIApplication().statusBars.children(matching: .other).element(boundBy: 1).children(matching: .other)
+            var waitedTime: TimeInterval = 0
+            
+            while ((0..<query.count).map({ query.element(boundBy: $0) }).contains(where: { $0.isLoadingIndicator })) && waitedTime < timeout {
+                sleep(1)
+                waitedTime += 1
+                print("Waiting for loading indicator to disappear...")
+            }
+        #endif
     }
 
     class func pathPrefix() -> URL? {
@@ -168,6 +188,28 @@ extension XCUIElement {
     }
 }
 
+extension XCUIElementQuery {
+    private var possibleLoadingIndicators: XCUIElementQuery {
+        let hasLoadingIndicatorSize = NSPredicate { (evaluatedObject, _) in
+            guard let element = evaluatedObject as? XCUIElementAttributes else {
+                return false
+            }
+            return element.frame.size.width == 10 && element.frame.size.height == 20
+        }
+
+        return self.containing(hasLoadingIndicatorSize)
+    }
+
+    var networkLoadingIndicators: XCUIElementQuery {
+        let whiteListedIdentifiers = ["GeofenceLocationTrackingOn", "StandardLocationTrackingOn"]
+        let subPredicates = whiteListedIdentifiers.map { NSPredicate(format: "identifier == %@", $0) }
+        let identifierIsWhitelisted = NSCompoundPredicate(orPredicateWithSubpredicates: subPredicates)
+        let isNetworkLoadingIndicator = NSCompoundPredicate(notPredicateWithSubpredicate: identifierIsWhitelisted)
+
+        return possibleLoadingIndicators.containing(isNetworkLoadingIndicator)
+    }
+}
+
 // Please don't remove the lines below
 // They are used to detect outdated configuration files
-// SnapshotHelperVersion [1.4]
+// SnapshotHelperVersion [1.5]
