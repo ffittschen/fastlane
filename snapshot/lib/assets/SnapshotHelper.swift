@@ -19,11 +19,6 @@ import XCTest
 var deviceLanguage = ""
 var locale = ""
 
-@available(*, deprecated, message: "use setupSnapshot: instead")
-func setLanguage(_ app: XCUIApplication) {
-    setupSnapshot(app)
-}
-
 func setupSnapshot(_ app: XCUIApplication) {
     Snapshot.setupSnapshot(app)
 }
