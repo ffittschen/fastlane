@@ -133,13 +133,13 @@ Here a few links to get started:
 - Create a new UI Test target in your Xcode project ([top part of this article](https://krausefx.com/blog/run-xcode-7-ui-tests-from-the-command-line))
 - Run `fastlane snapshot init` in your project folder
 - Add the ./SnapshotHelper.swift to your UI Test target (You can move the file anywhere you want)
-- (Objective C only) add the bridging header to your test class.
+- (Objective C only) import the swift header in your test class.
  - `#import "MYUITests-Swift.h"`
- - The bridging header is named after your test target with -Swift.h appended.
+ - The swift header is named after your test target with -Swift.h appended.
 - In your UI Test class, click the `Record` button on the bottom left and record your interaction
 - To take a snapshot, call the following between interactions
  -  Swift: `snapshot("01LoginScreen")`
- -  Objective C: `[Snapshot snapshot:@"01LoginScreen" waitForLoadingIndicator:YES];`
+ -  Objective C: `[Snapshot snapshot:@"01LoginScreen" timeWaitingForIdle:10];
 - Add the following code to your `setUp()` method
 
 **Swift**
